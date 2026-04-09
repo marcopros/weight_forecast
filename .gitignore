@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# DVC
+/dvc.lock
+
+# MLflow
+/mlruns/
+
+# Data (tracked by DVC, not git)
+data/processed/*.csv
+data/processed/*.joblib
+data/processed/*.json
+data/processed/*.txt
+data/processed/*.png
+!data/processed/.gitkeep
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Metrics (tracked by DVC)
+metrics.json

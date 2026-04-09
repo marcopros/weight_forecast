@@ -1,0 +1,68 @@
+stages:
+  clean:
+    cmd: python -m src.data.clean
+    deps:
+      - data/kernel/receivals.csv
+      - src/data/clean.py
+      - configs/params.yaml
+    outs:
+      - data/processed/master_for_modeling.csv
+
+  features:
+    cmd: python -m src.data.features
+    deps:
+      - data/processed/master_for_modeling.csv
+      - src/data/features.py
+      - configs/params.yaml
+    outs:
+      - data/processed/master_for_modeling.csv:
+          persist: true
+
+  train:
+    cmd: python -m src.models.train
+    deps:
+      - data/processed/master_for_modeling.csv
+      - src/models/train.py
+      - configs/params.yaml
+    outs:
+      - data/processed/lgbm_quantile_tau0.2.joblib
+    metrics:
+      - metrics.json:
+          cache: false
+    params:
+      - configs/params.yaml:
+          - model
+          - train
+
+  predict:
+    cmd: python -m src.models.predict
+    deps:
+      - data/processed/lgbm_quantile_tau0.2.joblib
+      - data/processed/master_for_modeling.csv
+      - data/prediction_mapping.csv
+      - src/models/predict.py
+      - configs/params.yaml
+    outs:
+      - data/processed/submission_2025.csv
+      - data/processed/predictions_2025.csv
+
+  monitor_drift:
+    cmd: python -m src.monitoring.drift
+    deps:
+      - data/processed/master_for_modeling.csv
+      - src/monitoring/drift.py
+      - configs/params.yaml
+    metrics:
+      - data/processed/drift_report.json:
+          cache: false
+
+  monitor_performance:
+    cmd: python -m src.monitoring.performance
+    deps:
+      - data/processed/predictions_2025.csv
+      - data/processed/master_for_modeling.csv
+      - src/monitoring/performance.py
+      - configs/params.yaml
+    metrics:
+      - data/processed/performance_report.json:
+          cache: false

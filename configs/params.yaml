@@ -1,0 +1,76 @@
+# ── Data paths ──────────────────────────────────────────────
+data:
+  raw:
+    receivals: data/kernel/receivals.csv
+    purchase_orders: data/kernel/purchase_orders.csv
+    materials: data/extended/materials.csv
+    transportation: data/extended/transportation.csv
+    prediction_mapping: data/prediction_mapping.csv
+    sample_submission: data/sample_submission.csv
+  processed:
+    dir: data/processed
+    receivals_cleaned: data/processed/receivals_cleaned.csv
+    master: data/processed/master_for_modeling.csv
+    model: data/processed/lgbm_quantile_tau0.2.joblib
+    predictions: data/processed/predictions_2025.csv
+    submission: data/processed/submission_2025.csv
+
+# ── Feature engineering ─────────────────────────────────────
+features:
+  lag_days: [7, 28, 56]
+  rolling_windows: [7, 28]
+  target_col: cumulative_weight
+  feature_cols:
+    - month
+    - day
+    - dayofweek
+    - dayofyear
+    - weekofyear
+    - quarter
+    - days_since_year_start
+    - lag_7d
+    - lag_28d
+    - lag_56d
+    - rolling_mean_7d
+    - rolling_sum_7d
+    - rolling_mean_28d
+    - rolling_sum_28d
+    - rm_mean
+    - rm_std
+    - rm_median
+
+# ── Training ────────────────────────────────────────────────
+train:
+  val_cutoff: "2024-01-01"
+  test_start: "2025-01-01"
+  test_end: "2025-05-31"
+  quantile_tau: 0.2
+
+model:
+  objective: regression
+  metric: mae
+  n_estimators: 1000
+  learning_rate: 0.05
+  num_leaves: 31
+  max_depth: -1
+  min_child_samples: 20
+  subsample: 0.8
+  colsample_bytree: 0.8
+  reg_alpha: 0.1
+  reg_lambda: 0.1
+  random_state: 42
+  n_jobs: -1
+  verbose: -1
+  early_stopping_rounds: 100
+
+# ── MLflow ──────────────────────────────────────────────────
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "cumulative_weight_forecast"
+  registered_model_name: "cumulative_weight_lgbm"
+
+# ── Monitoring ──────────────────────────────────────────────
+monitoring:
+  drift_threshold: 0.05
+  performance_threshold: 500.0  # max acceptable quantile loss
+  reference_data: data/processed/master_for_modeling.csv
