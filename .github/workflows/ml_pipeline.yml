@@ -52,8 +52,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run DVC pipeline
-        run: dvc repro
+      - name: Run pipeline
+        run: |
+          python -m src.data.clean
+          python -m src.data.features
+          python -m src.models.train
+          python -m src.models.predict
 
       - name: Upload metrics
         uses: actions/upload-artifact@v4
