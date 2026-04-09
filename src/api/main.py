@@ -11,9 +11,8 @@ import joblib
 import numpy as np
 import pandas as pd
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
-
 
 # ── Globals filled at startup ──────────────────────────────────────────────
 MODEL = None

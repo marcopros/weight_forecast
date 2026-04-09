@@ -5,12 +5,13 @@ Can be run standalone: python -m src.monitoring.drift
 """
 
 import json
+
 import pandas as pd
 import yaml
 
 try:
-    from evidently.report import Report
     from evidently.metric_preset import DataDriftPreset
+    from evidently.report import Report
 
     EVIDENTLY_AVAILABLE = True
 except ImportError:
@@ -80,7 +81,6 @@ def run(config_path: str = "configs/params.yaml"):
     cfg = load_config(config_path)
     feature_cols = cfg["features"]["feature_cols"]
     master_path = cfg["data"]["processed"]["master"]
-    pred_path = cfg["data"]["processed"]["predictions"]
 
     print("Loading reference (training) data...")
     reference = pd.read_csv(master_path, parse_dates=["date"])

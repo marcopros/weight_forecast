@@ -3,14 +3,16 @@
 Can be run standalone: python -m src.models.predict
 """
 
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 import yaml
 from joblib import Parallel, delayed
 
-from src.data.clean import load_receivals, aggregate_daily, build_master_table, load_prediction_mapping
-from src.data.features import add_temporal_features, _compute_features_for_rm, add_rm_stats
+from src.data.clean import (
+    load_prediction_mapping,
+)
+from src.data.features import _compute_features_for_rm, add_rm_stats, add_temporal_features
 
 
 def load_config(path: str = "configs/params.yaml") -> dict:

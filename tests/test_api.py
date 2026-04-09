@@ -1,10 +1,11 @@
 """Tests for the FastAPI serving endpoint."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
-
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -49,8 +50,6 @@ def mock_globals():
         app.router.lifespan_context = _noop_lifespan
         yield TestClient(app)
 
-
-from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def _noop_lifespan(app):

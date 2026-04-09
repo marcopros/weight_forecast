@@ -4,8 +4,8 @@ Run with: streamlit run src/monitoring/dashboard.py
 """
 
 import json
+
 import pandas as pd
-import numpy as np
 import streamlit as st
 import yaml
 
@@ -23,7 +23,7 @@ def main():
 
     # ── Sidebar ─────────────────────────────────────────────
     st.sidebar.header("Settings")
-    tau = st.sidebar.number_input("Quantile τ", value=cfg["train"]["quantile_tau"], step=0.05)
+    st.sidebar.number_input("Quantile τ", value=cfg["train"]["quantile_tau"], step=0.05)
     perf_threshold = cfg["monitoring"]["performance_threshold"]
 
     # ── Performance Report ──────────────────────────────────

@@ -5,9 +5,8 @@ Can be run standalone: python -m src.data.features
 """
 
 import pandas as pd
-import numpy as np
-from joblib import Parallel, delayed
 import yaml
+from joblib import Parallel, delayed
 
 
 def load_config(path: str = "configs/params.yaml") -> dict:

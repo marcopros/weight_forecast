@@ -5,10 +5,11 @@ Can be run standalone: python -m src.models.train
 """
 
 import json
+
+import joblib
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
-import joblib
 import yaml
 
 try:

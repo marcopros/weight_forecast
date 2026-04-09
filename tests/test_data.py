@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from src.data.clean import aggregate_daily, build_master_table
-from src.data.features import add_temporal_features, _compute_features_for_rm
+from src.data.features import _compute_features_for_rm, add_temporal_features
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
@@ -81,7 +81,9 @@ class TestFeatures:
     def test_rolling_no_leakage(self):
         """Rolling features must be shifted by 1 to avoid data leakage."""
         dates = pd.date_range("2023-01-01", periods=10, freq="D")
-        df = pd.DataFrame({"date": dates, "net_weight": [0] * 9 + [100], "cumulative_weight": range(10)})
+        df = pd.DataFrame({
+            "date": dates, "net_weight": [0] * 9 + [100], "cumulative_weight": range(10),
+        })
         result = _compute_features_for_rm(df, lag_days=[], rolling_windows=[7])
         # The last row's rolling stats should NOT include day 10's net_weight=100
         # (because of shift(1))

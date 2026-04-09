@@ -4,6 +4,7 @@ Can be run standalone: python -m src.monitoring.performance
 """
 
 import json
+
 import numpy as np
 import pandas as pd
 import yaml
@@ -77,13 +78,14 @@ def run(config_path: str = "configs/params.yaml"):
 
     if "predicted_cumulative_weight" in preds.columns:
         preds = preds.rename(columns={"predicted_cumulative_weight": "cumulative_weight_pred"})
-    
+
     metrics = evaluate_predictions(preds, actuals, tau)
     print(f"Performance metrics: {json.dumps(metrics, indent=2)}")
 
     retrain = check_retrain_needed(metrics, threshold)
     if retrain:
-        print(f"⚠ Quantile loss ({metrics.get('quantile_loss', 'N/A')}) > threshold ({threshold}). Retrain recommended.")
+        ql = metrics.get('quantile_loss', 'N/A')
+        print(f"⚠ Quantile loss ({ql}) > threshold ({threshold}). Retrain recommended.")
     else:
         print("Model performance is within acceptable range.")
 
