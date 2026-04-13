@@ -73,7 +73,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ml-model
-          path: data/processed/lgbm_quantile_tau0.2.joblib
+          path: |
+            data/processed/lgbm_quantile_tau0.2.joblib
+            data/processed/master_for_modeling.csv
 
   build-and-push:
     needs: train-and-evaluate
