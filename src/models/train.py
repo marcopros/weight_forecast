@@ -76,7 +76,10 @@ def run_baselines(
     }
 
     # Baseline 2: Per-rm_id mean (last year same period)
-    rm_means = master_df[master_df["date"] < val_cutoff].groupby("rm_id")["cumulative_weight"].mean()
+    rm_means = (
+        master_df[master_df["date"] < val_cutoff]
+        .groupby("rm_id")["cumulative_weight"].mean()
+    )
     preds_rm_mean = val_df["rm_id"].map(rm_means).fillna(train_mean).values
     results["per_rm_mean"] = {
         "quantile_loss": quantile_loss(y_val.values, preds_rm_mean, tau),
@@ -88,7 +91,11 @@ def run_baselines(
     train_df["dayofyear"] = train_df["date"].dt.dayofyear
     val_df_b = val_df.copy()
     val_df_b["dayofyear"] = val_df_b["date"].dt.dayofyear
-    last_year = train_df.sort_values("date").groupby(["rm_id", "dayofyear"]).last()["cumulative_weight"]
+    last_year = (
+        train_df.sort_values("date")
+        .groupby(["rm_id", "dayofyear"])
+        .last()["cumulative_weight"]
+    )
     preds_ly = val_df_b.set_index(["rm_id", "dayofyear"]).index.map(
         lambda x: last_year.get(x, train_mean)
     )
@@ -155,7 +162,7 @@ def analyze_errors_per_rm(
         "underestimating_rm_ids": int((per_rm["mean_error"] > 0).sum()),
     }
 
-    print(f"\n── Per-rm_id Error Analysis ──")
+    print("\n── Per-rm_id Error Analysis ──")
     print(f"  Total rm_ids evaluated: {summary['total_rm_ids']}")
     print(f"  Overestimating: {summary['overestimating_rm_ids']}")
     print(f"  Underestimating: {summary['underestimating_rm_ids']}")
@@ -252,7 +259,7 @@ def run(config_path: str = "configs/params.yaml"):
 
     # Feature importance
     feature_importance = get_feature_importance(model, cfg["features"]["feature_cols"])
-    print(f"\n── Feature Importance (top 5) ──")
+    print("\n── Feature Importance (top 5) ──")
     for name, imp in list(feature_importance.items())[:5]:
         print(f"  {name:25s}  {imp}")
 
@@ -285,7 +292,9 @@ def run(config_path: str = "configs/params.yaml"):
 
     if MLFLOW_AVAILABLE:
         mlflow.log_metrics(metrics)
-        mlflow.log_metrics({f"baseline_{k}_ql": v["quantile_loss"] for k, v in baseline_results.items()})
+        mlflow.log_metrics(
+            {f"baseline_{k}_ql": v["quantile_loss"] for k, v in baseline_results.items()}
+        )
         mlflow.log_dict(feature_importance, "feature_importance.json")
         mlflow.log_dict(error_analysis, "error_analysis.json")
         mlflow.set_tag("model_hash", model_hash)
@@ -301,7 +310,9 @@ def run(config_path: str = "configs/params.yaml"):
     print("Metrics saved → metrics.json")
 
     # Save error analysis separately
-    error_path = cfg["data"]["processed"].get("error_analysis", "data/processed/error_analysis.json")
+    error_path = cfg["data"]["processed"].get(
+        "error_analysis", "data/processed/error_analysis.json"
+    )
     with open(error_path, "w") as f:
         json.dump(error_analysis, f, indent=2, default=str)
     print(f"Error analysis saved → {error_path}")

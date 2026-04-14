@@ -6,7 +6,6 @@ Start with: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
 """
 
 import csv
-import json
 import logging
 import os
 import time
@@ -64,15 +63,22 @@ def _init_prediction_log():
         os.makedirs(os.path.dirname(PREDICTION_LOG_PATH), exist_ok=True)
         with open(PREDICTION_LOG_PATH, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["timestamp", "rm_id", "forecast_end_date", "cumulative_weight", "latency_ms"])
+            cols = ["timestamp", "rm_id", "forecast_end_date",
+                    "cumulative_weight", "latency_ms"]
+            writer.writerow(cols)
 
 
-def _log_prediction(rm_id: int, forecast_end_date: str, cumulative_weight: float, latency_ms: float):
+def _log_prediction(
+    rm_id: int, forecast_end_date: str,
+    cumulative_weight: float, latency_ms: float,
+):
     """Append prediction to the prediction log (append-only)."""
     try:
         with open(PREDICTION_LOG_PATH, "a", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([datetime.now(UTC).isoformat(), rm_id, forecast_end_date, cumulative_weight, latency_ms])
+            row = [datetime.now(UTC).isoformat(), rm_id,
+                   forecast_end_date, cumulative_weight, latency_ms]
+            writer.writerow(row)
     except OSError:
         logger.warning("Failed to write prediction log")
 
@@ -80,7 +86,8 @@ def _log_prediction(rm_id: int, forecast_end_date: str, cumulative_weight: float
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load model and reference data once at startup."""
-    global MODEL, RM_STATS, MASTER_DF, MATERIAL_INFO, CFG, KNOWN_RM_IDS, RM_HISTORY_INDEX, MODEL_HASH
+    global MODEL, RM_STATS, MASTER_DF, MATERIAL_INFO, CFG
+    global KNOWN_RM_IDS, RM_HISTORY_INDEX, MODEL_HASH
     cfg_path = os.environ.get("CONFIG_PATH", "configs/params.yaml")
     CFG = load_config(cfg_path)
 

@@ -6,7 +6,6 @@ Single source of truth for feature construction — used by:
 - src/api/main.py (online serving)
 """
 
-import numpy as np
 import pandas as pd
 import yaml
 
@@ -106,7 +105,9 @@ def build_single_row(
 
     row = build_temporal_features(pd.Timestamp(target_date))
     row.update(build_lag_features(rm_history, pd.Timestamp(target_date), feat_cfg["lag_days"]))
-    row.update(build_rolling_features(rm_history, pd.Timestamp(target_date), feat_cfg["rolling_windows"]))
+    row.update(build_rolling_features(
+        rm_history, pd.Timestamp(target_date), feat_cfg["rolling_windows"]
+    ))
     row.update(build_rm_stat_features(rm_stats, rm_id))
 
     if cfg["features"].get("use_material_features", False):

@@ -53,7 +53,9 @@ def load_materials(path: str) -> pd.DataFrame:
 
     # Format type (already numeric or needs encoding)
     if "raw_material_format_type" in df.columns:
-        df["format_type"] = pd.to_numeric(df["raw_material_format_type"], errors="coerce").fillna(0.0)
+        df["format_type"] = pd.to_numeric(
+            df["raw_material_format_type"], errors="coerce"
+        ).fillna(0.0)
     else:
         df["format_type"] = 0.0
 

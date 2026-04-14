@@ -11,8 +11,8 @@ import pytest
 from src.data.clean import aggregate_daily, build_master_table
 from src.data.feature_builder import (
     build_lag_features,
-    build_rolling_features,
     build_rm_stat_features,
+    build_rolling_features,
     build_single_row,
     build_temporal_features,
 )
@@ -127,7 +127,10 @@ class TestFeatureBuilderConsistency:
 
     def test_rm_stats_unknown_rm(self):
         """Unknown rm_id should return zero stats."""
-        rm_stats = pd.DataFrame({"rm_id": [1], "rm_mean": [100.0], "rm_std": [10.0], "rm_median": [95.0]})
+        rm_stats = pd.DataFrame(
+            {"rm_id": [1], "rm_mean": [100.0],
+             "rm_std": [10.0], "rm_median": [95.0]}
+        )
         feats = build_rm_stat_features(rm_stats, 999)
         assert feats["rm_mean"] == 0.0
 

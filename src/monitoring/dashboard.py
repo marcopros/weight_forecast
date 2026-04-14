@@ -161,7 +161,8 @@ def main():
         ecol1.metric("Total rm_ids Evaluated", error_data.get("total_rm_ids", 0))
         ecol2.metric(
             "Overestimating / Underestimating",
-            f"{error_data.get('overestimating_rm_ids', 0)} / {error_data.get('underestimating_rm_ids', 0)}"
+            f"{error_data.get('overestimating_rm_ids', 0)}"
+            f" / {error_data.get('underestimating_rm_ids', 0)}"
         )
 
         st.subheader("Worst 10 rm_ids (by Quantile Loss)")

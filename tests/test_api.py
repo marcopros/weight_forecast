@@ -191,8 +191,6 @@ class TestPredictEndpoint:
 class TestActualsEndpoint:
     def test_submit_actuals(self, mock_globals):
         """Test feedback loop endpoint."""
-        import tempfile
-        import os
         with patch("src.api.main.os.path.exists", return_value=False), \
              patch("builtins.open", create=True):
             client = mock_globals
