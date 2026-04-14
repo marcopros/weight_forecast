@@ -1,13 +1,16 @@
-.PHONY: clean features train predict serve test monitor dashboard all
+.PHONY: clean features train predict serve test monitor dashboard all validate
 
 # Full pipeline
-all: clean features train predict
+all: clean features validate train predict
 
 clean:
 	python -m src.data.clean
 
 features:
 	python -m src.data.features
+
+validate:
+	python -m src.data.validate
 
 train:
 	python -m src.models.train
@@ -30,6 +33,9 @@ dashboard:
 # Testing
 test:
 	pytest tests/ -v
+
+test-integration:
+	pytest tests/test_integration.py -v
 
 lint:
 	ruff check src/ tests/

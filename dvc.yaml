@@ -3,7 +3,9 @@ stages:
     cmd: python -m src.data.clean
     deps:
       - data/kernel/receivals.csv
+      - data/extended/materials.csv
       - src/data/clean.py
+      - src/data/validate.py
       - configs/params.yaml
     outs:
       - data/processed/master_for_modeling.csv
@@ -13,10 +15,18 @@ stages:
     deps:
       - data/processed/master_for_modeling.csv
       - src/data/features.py
+      - src/data/feature_builder.py
       - configs/params.yaml
     outs:
       - data/processed/master_for_modeling.csv:
           persist: true
+
+  validate:
+    cmd: python -m src.data.validate
+    deps:
+      - data/processed/master_for_modeling.csv
+      - src/data/validate.py
+      - configs/params.yaml
 
   train:
     cmd: python -m src.models.train
@@ -28,6 +38,9 @@ stages:
       - data/processed/lgbm_quantile_tau0.2.joblib
     metrics:
       - metrics.json:
+          cache: false
+    plots:
+      - data/processed/error_analysis.json:
           cache: false
     params:
       - configs/params.yaml:

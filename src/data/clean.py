@@ -1,6 +1,7 @@
 """Data loading and cleaning pipeline.
 
-Reads raw CSVs, normalises types/dates, and writes cleaned versions to data/processed/.
+Reads raw CSVs, normalises types/dates, validates data quality,
+and writes cleaned versions to data/processed/.
 Can be run standalone: python -m src.data.clean
 """
 
@@ -8,6 +9,8 @@ import os
 
 import pandas as pd
 import yaml
+
+from src.data.validate import validate_master, validate_receivals
 
 
 def load_config(path: str = "configs/params.yaml") -> dict:
@@ -18,8 +21,12 @@ def load_config(path: str = "configs/params.yaml") -> dict:
 def load_receivals(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, low_memory=False)
     df["date_arrival"] = pd.to_datetime(df["date_arrival"], errors="coerce", utc=True)
-    df = df.dropna(subset=["date_arrival"])
+    df = df.dropna(subset=["date_arrival", "rm_id", "net_weight"])
+    df["rm_id"] = df["rm_id"].astype(int)
     df["date"] = df["date_arrival"].dt.tz_localize(None)
+    # Filter out negative weights
+    df = df[df["net_weight"] >= 0]
+    validate_receivals(df)
     return df
 
 
@@ -29,6 +36,30 @@ def load_prediction_mapping(path: str) -> pd.DataFrame:
     if "forecast_start_date" in df.columns:
         df["forecast_start_date"] = pd.to_datetime(df["forecast_start_date"])
     return df
+
+
+def load_materials(path: str) -> pd.DataFrame:
+    """Load and encode material features (alloy type, format type)."""
+    df = pd.read_csv(path, low_memory=False)
+    df = df.dropna(subset=["rm_id"])
+    df["rm_id"] = df["rm_id"].astype(int)
+
+    # Encode alloy as numeric (label encoding)
+    if "raw_material_alloy" in df.columns:
+        alloy_map = {v: i for i, v in enumerate(df["raw_material_alloy"].dropna().unique())}
+        df["alloy_encoded"] = df["raw_material_alloy"].map(alloy_map).fillna(-1).astype(float)
+    else:
+        df["alloy_encoded"] = 0.0
+
+    # Format type (already numeric or needs encoding)
+    if "raw_material_format_type" in df.columns:
+        df["format_type"] = pd.to_numeric(df["raw_material_format_type"], errors="coerce").fillna(0.0)
+    else:
+        df["format_type"] = 0.0
+
+    # Keep one row per rm_id (take first)
+    df = df.groupby("rm_id").first().reset_index()
+    return df[["rm_id", "alloy_encoded", "format_type"]]
 
 
 def aggregate_daily(receivals_df: pd.DataFrame) -> pd.DataFrame:
@@ -91,6 +122,21 @@ def run(config_path: str = "configs/params.yaml"):
 
     print("Building master table...")
     master = build_master_table(daily, unique_rm_ids)
+
+    # Merge material features if available
+    if cfg["features"].get("use_material_features", False):
+        materials_path = cfg["data"]["raw"].get("materials")
+        if materials_path and os.path.exists(materials_path):
+            print("Loading material features...")
+            materials = load_materials(materials_path)
+            master = pd.merge(master, materials, on="rm_id", how="left")
+            master["alloy_encoded"] = master["alloy_encoded"].fillna(0.0)
+            master["format_type"] = master["format_type"].fillna(0.0)
+            print(f"  Merged {len(materials)} material records")
+
+    # Validate output
+    validate_master(master)
+    print("✓ Master table passed validation")
 
     out_path = cfg["data"]["processed"]["master"]
     master.to_csv(out_path, index=False)

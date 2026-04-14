@@ -9,11 +9,25 @@ services:
       - "8000:8000"
     environment:
       - CONFIG_PATH=configs/params.yaml
+    volumes:
+      - ../data/processed:/app/data/processed
+      - ../metrics.json:/app/metrics.json:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   dashboard:
     build:
@@ -21,7 +35,16 @@ services:
       dockerfile: docker/Dockerfile.api
     ports:
       - "8501:8501"
+    volumes:
+      - ../data/processed:/app/data/processed:ro
+      - ../metrics.json:/app/metrics.json:ro
     command: ["streamlit", "run", "src/monitoring/dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
     depends_on:
       api:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    restart: unless-stopped

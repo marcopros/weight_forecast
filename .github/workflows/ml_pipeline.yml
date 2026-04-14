@@ -53,12 +53,56 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Validate data
+        run: python -m src.data.validate || echo "::warning::Data validation found issues"
+
       - name: Run pipeline
         run: |
           python -m src.data.clean
           python -m src.data.features
           python -m src.models.train
           python -m src.models.predict
+
+      - name: Run monitoring
+        run: |
+          python -m src.monitoring.drift
+          python -m src.monitoring.performance
+
+      - name: Metric gate - check for regression
+        run: |
+          python -c "
+          import json, sys
+          with open('metrics.json') as f:
+              metrics = json.load(f)
+          ql = metrics['quantile_loss']
+          mae = metrics['mae']
+          print(f'Quantile Loss: {ql:.2f}')
+          print(f'MAE: {mae:.2f}')
+          # Fail if metrics are unreasonably bad (safety gate)
+          if ql > 200000:
+              print('::error::Quantile loss exceeds safety threshold (200000)')
+              sys.exit(1)
+          if mae > 500000:
+              print('::error::MAE exceeds safety threshold (500000)')
+              sys.exit(1)
+          print('Metric gate passed.')
+          "
+
+      - name: Check drift report
+        run: |
+          python -c "
+          import json
+          try:
+              with open('data/processed/drift_report.json') as f:
+                  drift = json.load(f)
+              if drift.get('dataset_drift'):
+                  share = drift.get('share_of_drifted_columns', 0)
+                  print(f'::warning::Data drift detected ({share:.0%} of columns drifted)')
+              else:
+                  print('No significant data drift detected.')
+          except FileNotFoundError:
+              print('::warning::No drift report found')
+          "
 
       - name: Upload metrics
         uses: actions/upload-artifact@v4
@@ -68,6 +112,7 @@ jobs:
             metrics.json
             data/processed/drift_report.json
             data/processed/performance_report.json
+            data/processed/error_analysis.json
 
       - name: Upload model
         uses: actions/upload-artifact@v4
@@ -76,6 +121,43 @@ jobs:
           path: |
             data/processed/lgbm_quantile_tau0.2.joblib
             data/processed/master_for_modeling.csv
+
+      - name: Post metrics summary
+        if: github.event_name == 'push'
+        run: |
+          python -c "
+          import json
+          with open('metrics.json') as f:
+              m = json.load(f)
+          summary = '## Model Metrics\n'
+          summary += f'| Metric | Value |\n|--------|-------|\n'
+          summary += f'| Quantile Loss | {m[\"quantile_loss\"]:.2f} |\n'
+          summary += f'| MAE | {m[\"mae\"]:.2f} |\n'
+          summary += f'| RMSE | {m[\"rmse\"]:.2f} |\n'
+          summary += f'| Model Hash | {m.get(\"model_hash\", \"N/A\")} |\n'
+          summary += f'| Best Iteration | {m.get(\"best_iteration\", \"N/A\")} |\n'
+          baselines = m.get('baselines', {})
+          if baselines:
+              summary += '\n### Baseline Comparison\n'
+              summary += '| Baseline | QL | MAE |\n|----------|-------|-----|\n'
+              for name, bm in baselines.items():
+                  summary += f'| {name} | {bm[\"quantile_loss\"]:.2f} | {bm[\"mae\"]:.2f} |\n'
+          with open('$GITHUB_STEP_SUMMARY', 'a') if '$GITHUB_STEP_SUMMARY' != '' else open('/dev/null', 'w') as f:
+              f.write(summary)
+          print(summary)
+          " || true
+
+  security-scan:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run pip-audit for dependency vulnerabilities
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt || echo "::warning::Dependency vulnerabilities found"
 
   build-and-push:
     needs: train-and-evaluate
@@ -102,6 +184,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract model hash for tagging
+        id: model_meta
+        run: |
+          MODEL_HASH=$(python -c "import json; print(json.load(open('data/processed/../metrics.json')).get('model_hash', 'unknown'))" 2>/dev/null || echo "unknown")
+          echo "model_hash=$MODEL_HASH" >> $GITHUB_OUTPUT
+          echo "Model hash: $MODEL_HASH"
+
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
@@ -111,5 +200,6 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/forecast-api:latest
             ghcr.io/${{ github.repository }}/forecast-api:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/forecast-api:model-${{ steps.model_meta.outputs.model_hash }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

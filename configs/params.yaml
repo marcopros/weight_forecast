@@ -14,12 +14,15 @@ data:
     model: data/processed/lgbm_quantile_tau0.2.joblib
     predictions: data/processed/predictions_2025.csv
     submission: data/processed/submission_2025.csv
+    prediction_log: data/processed/prediction_log.csv
+    error_analysis: data/processed/error_analysis.json
 
 # ── Feature engineering ─────────────────────────────────────
 features:
   lag_days: [7, 28, 56]
   rolling_windows: [7, 28]
   target_col: cumulative_weight
+  use_material_features: true
   feature_cols:
     - month
     - day
@@ -38,6 +41,8 @@ features:
     - rm_mean
     - rm_std
     - rm_median
+    - alloy_encoded
+    - format_type
 
 # ── Training ────────────────────────────────────────────────
 train:
@@ -45,10 +50,12 @@ train:
   test_start: "2025-01-01"
   test_end: "2025-05-31"
   quantile_tau: 0.2
+  run_baselines: true
 
 model:
-  objective: regression
-  metric: mae
+  objective: quantile
+  alpha: 0.2
+  metric: quantile
   n_estimators: 1000
   learning_rate: 0.05
   num_leaves: 31
@@ -74,3 +81,5 @@ monitoring:
   drift_threshold: 0.05
   performance_threshold: 500.0  # max acceptable quantile loss
   reference_data: data/processed/master_for_modeling.csv
+  prediction_log: data/processed/prediction_log.csv
+  latency_p95_threshold_ms: 500

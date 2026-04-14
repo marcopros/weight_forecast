@@ -14,9 +14,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ src/
 COPY configs/ configs/
 
-# Copy model and reference data
+# Copy model and reference data (fallback if no volume mount)
 COPY data/processed/lgbm_quantile_tau0.2.joblib data/processed/
 COPY data/processed/master_for_modeling.csv data/processed/
+COPY data/processed/predictions_2025.csv data/processed/
+COPY data/processed/error_analysis.json data/processed/
+
+# Copy metrics.json (root-level)
+COPY metrics.json .
+
+# Copy extended data for material features
+COPY data/extended/ data/extended/
 
 EXPOSE 8000
 

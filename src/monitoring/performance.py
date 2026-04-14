@@ -1,9 +1,13 @@
 """Performance monitoring: track predictions vs actuals over time.
 
+Supports both offline evaluation (validation data) and online monitoring
+(comparing logged predictions against actual data when available).
 Can be run standalone: python -m src.monitoring.performance
 """
 
 import json
+import os
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -25,10 +29,7 @@ def evaluate_predictions(
     actuals_df: pd.DataFrame,
     tau: float = 0.2,
 ) -> dict:
-    """Compare predictions against actuals. Returns performance metrics.
-
-    Both DataFrames must have columns: rm_id, date (or forecast_end_date), and value column.
-    """
+    """Compare predictions against actuals. Returns performance metrics."""
     merged = predictions_df.merge(
         actuals_df,
         on=["rm_id", "date"],
@@ -57,6 +58,39 @@ def evaluate_predictions(
 def check_retrain_needed(metrics: dict, threshold: float) -> bool:
     """Returns True if quantile loss exceeds threshold, suggesting retraining."""
     return metrics.get("quantile_loss", 0) > threshold
+
+
+def analyze_prediction_distribution(pred_log_path: str) -> dict:
+    """Analyze logged predictions for distribution shifts over time."""
+    if not os.path.exists(pred_log_path):
+        return {"status": "no_prediction_log"}
+
+    log_df = pd.read_csv(pred_log_path, parse_dates=["timestamp"])
+    if log_df.empty:
+        return {"status": "empty_log"}
+
+    log_df["date"] = log_df["timestamp"].dt.date
+
+    # Compare recent vs older predictions
+    daily_stats = log_df.groupby("date").agg(
+        n_requests=("cumulative_weight", "size"),
+        mean_prediction=("cumulative_weight", "mean"),
+        std_prediction=("cumulative_weight", "std"),
+        p95_latency_ms=("latency_ms", lambda x: x.quantile(0.95)),
+        p50_latency_ms=("latency_ms", lambda x: x.quantile(0.50)),
+    ).reset_index()
+
+    recent = daily_stats.tail(7)
+    summary = {
+        "status": "ok",
+        "total_predictions": int(len(log_df)),
+        "unique_rm_ids_served": int(log_df["rm_id"].nunique()),
+        "recent_daily_stats": recent.to_dict(orient="records"),
+        "overall_mean_prediction": float(log_df["cumulative_weight"].mean()),
+        "overall_mean_latency_ms": float(log_df["latency_ms"].mean()),
+        "p95_latency_ms": float(log_df["latency_ms"].quantile(0.95)),
+    }
+    return summary
 
 
 def run(config_path: str = "configs/params.yaml"):
@@ -89,9 +123,25 @@ def run(config_path: str = "configs/params.yaml"):
     else:
         print("Model performance is within acceptable range.")
 
+    # Analyze prediction log if available
+    pred_log_path = cfg["monitoring"].get("prediction_log", "data/processed/prediction_log.csv")
+    pred_log_analysis = analyze_prediction_distribution(pred_log_path)
+    if pred_log_analysis.get("status") == "ok":
+        print(f"Prediction log: {pred_log_analysis['total_predictions']} predictions logged")
+        print(f"  p95 latency: {pred_log_analysis['p95_latency_ms']:.1f}ms")
+    else:
+        print(f"Prediction log: {pred_log_analysis.get('status', 'unavailable')}")
+
+    report = {
+        "metrics": metrics,
+        "retrain_recommended": retrain,
+        "prediction_log_analysis": pred_log_analysis,
+        "evaluated_at": datetime.now(UTC).isoformat(),
+    }
+
     out_path = "data/processed/performance_report.json"
     with open(out_path, "w") as f:
-        json.dump({"metrics": metrics, "retrain_recommended": retrain}, f, indent=2)
+        json.dump(report, f, indent=2, default=str)
     print(f"Performance report saved → {out_path}")
 
     return metrics

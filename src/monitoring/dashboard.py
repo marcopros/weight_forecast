@@ -1,5 +1,8 @@
 """Streamlit dashboard for monitoring model performance and data drift.
 
+Includes: performance metrics, data drift, predictions overview,
+feature importance, per-rm_id error analysis, baseline comparison,
+API latency monitoring, and model versioning info.
 Run with: streamlit run src/monitoring/dashboard.py
 """
 
@@ -47,6 +50,16 @@ def main():
             )
         else:
             st.success("Model performance is within acceptable range.")
+
+        # Show prediction log analysis if available
+        log_analysis = perf.get("prediction_log_analysis", {})
+        if log_analysis.get("status") == "ok":
+            st.subheader("API Latency & Usage")
+            lcol1, lcol2, lcol3 = st.columns(3)
+            lcol1.metric("Total Predictions Served", log_analysis.get("total_predictions", 0))
+            lcol2.metric("p95 Latency", f"{log_analysis.get('p95_latency_ms', 0):.1f} ms")
+            lcol3.metric("Unique rm_ids Served", log_analysis.get("unique_rm_ids_served", 0))
+
     except FileNotFoundError:
         st.warning("No performance report found. Run `python -m src.monitoring.performance` first.")
 
@@ -87,17 +100,84 @@ def main():
     except FileNotFoundError:
         st.warning("No predictions found. Run `python -m src.models.predict` first.")
 
-    # ── Training Metrics (from MLflow or metrics.json) ──────
-    st.header("4. Training Metrics")
+    # ── Training Metrics + Model Info ───────────────────────
+    st.header("4. Training Metrics & Model Info")
     try:
         with open("metrics.json") as f:
             train_metrics = json.load(f)
+
         col1, col2, col3 = st.columns(3)
-        col1.metric("Train QL", f"{train_metrics.get('quantile_loss', 0):.4f}")
-        col2.metric("Train MAE", f"{train_metrics.get('mae', 0):.2f}")
-        col3.metric("Train RMSE", f"{train_metrics.get('rmse', 0):.2f}")
+        col1.metric("Quantile Loss", f"{train_metrics.get('quantile_loss', 0):.4f}")
+        col2.metric("MAE", f"{train_metrics.get('mae', 0):.2f}")
+        col3.metric("RMSE", f"{train_metrics.get('rmse', 0):.2f}")
+
+        # Model version info
+        mcol1, mcol2, mcol3 = st.columns(3)
+        mcol1.metric("Model Hash", train_metrics.get("model_hash", "N/A"))
+        mcol2.metric("Best Iteration", train_metrics.get("best_iteration", "N/A"))
+        mcol3.metric("Train Duration", f"{train_metrics.get('train_duration_seconds', 0):.1f}s")
+
+        # ── Baseline Comparison ─────────────────────────────
+        baselines = train_metrics.get("baselines", {})
+        if baselines:
+            st.subheader("Baseline Comparison")
+            baseline_data = []
+            for name, bm in baselines.items():
+                baseline_data.append({
+                    "Model": name,
+                    "Quantile Loss": bm.get("quantile_loss", 0),
+                    "MAE": bm.get("mae", 0),
+                })
+            baseline_data.append({
+                "Model": "LightGBM (ours)",
+                "Quantile Loss": train_metrics.get("quantile_loss", 0),
+                "MAE": train_metrics.get("mae", 0),
+            })
+            baseline_df = pd.DataFrame(baseline_data).sort_values("Quantile Loss")
+            st.dataframe(baseline_df, use_container_width=True, hide_index=True)
+
+            # Bar chart comparison
+            st.bar_chart(baseline_df.set_index("Model")["Quantile Loss"])
+
+        # ── Feature Importance ──────────────────────────────
+        feat_imp = train_metrics.get("feature_importance", {})
+        if feat_imp:
+            st.subheader("Feature Importance")
+            imp_df = pd.DataFrame(
+                [{"Feature": k, "Importance": v} for k, v in feat_imp.items()]
+            ).sort_values("Importance", ascending=True)
+            st.bar_chart(imp_df.set_index("Feature"))
+
     except FileNotFoundError:
         st.info("No training metrics found. Run `python -m src.models.train` first.")
+
+    # ── Error Analysis ──────────────────────────────────────
+    st.header("5. Per-rm_id Error Analysis")
+    try:
+        with open("data/processed/error_analysis.json") as f:
+            error_data = json.load(f)
+
+        ecol1, ecol2 = st.columns(2)
+        ecol1.metric("Total rm_ids Evaluated", error_data.get("total_rm_ids", 0))
+        ecol2.metric(
+            "Overestimating / Underestimating",
+            f"{error_data.get('overestimating_rm_ids', 0)} / {error_data.get('underestimating_rm_ids', 0)}"
+        )
+
+        st.subheader("Worst 10 rm_ids (by Quantile Loss)")
+        worst = error_data.get("top_10_worst", [])
+        if worst:
+            worst_df = pd.DataFrame(worst)
+            st.dataframe(worst_df, use_container_width=True, hide_index=True)
+
+        st.subheader("Best 10 rm_ids (by Quantile Loss)")
+        best = error_data.get("top_10_best", [])
+        if best:
+            best_df = pd.DataFrame(best)
+            st.dataframe(best_df, use_container_width=True, hide_index=True)
+
+    except FileNotFoundError:
+        st.info("No error analysis found. Run `python -m src.models.train` first.")
 
 
 if __name__ == "__main__":
