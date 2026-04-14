@@ -121,6 +121,8 @@ jobs:
           path: |
             data/processed/lgbm_quantile_tau0.2.joblib
             data/processed/master_for_modeling.csv
+            data/processed/predictions_2025.csv
+            data/processed/error_analysis.json
 
       - name: Post metrics summary
         if: github.event_name == 'push'
@@ -174,6 +176,12 @@ jobs:
           name: ml-model
           path: data/processed/
 
+      - name: Download metrics artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ml-metrics
+          path: .
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -187,7 +195,7 @@ jobs:
       - name: Extract model hash for tagging
         id: model_meta
         run: |
-          MODEL_HASH=$(python -c "import json; print(json.load(open('data/processed/../metrics.json')).get('model_hash', 'unknown'))" 2>/dev/null || echo "unknown")
+          MODEL_HASH=$(python -c "import json; print(json.load(open('metrics.json')).get('model_hash', 'unknown'))" 2>/dev/null || echo "unknown")
           echo "model_hash=$MODEL_HASH" >> $GITHUB_OUTPUT
           echo "Model hash: $MODEL_HASH"
 
